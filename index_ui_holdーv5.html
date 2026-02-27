@@ -1,0 +1,2143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>声の書 – UI版</title>
+
+  <style>
+    /* --- Font --- */
+    @font-face {
+      font-family: 'LianmianVF';
+      src: url('可変連綿体2.6VF.ttf') format('truetype');
+      font-display: swap;
+    }
+
+    :root{
+      --bg-paper:#f4f1e8;
+      --ink:#1a1a1a;
+      --muted:#666;
+      --line:rgba(0,0,0,.08);
+      --panel:rgba(255,255,255,.55);
+      --blur: blur(10px);
+      --seal:#c93a40;
+      --ok:#35a853;
+      --paper-texture:url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiB2aWV3Qm94PSIwIDAgNDAwIDQwMCI+PGZpbHRlciBpZD0iYSI+PGZlVHVyYnVsZW5jZSBiYXNlRnJlcXVlbmN5PSIuMDUiIG51bT0iNTAiIHJlc3VsdD0ibm9pc2UiLz48ZmVEaWZmdXNlTGlnaHRpbmcgaW49Im5vaXNlIiBsaWdodGluZy1jb2xvcj0iI2ZmZjVlNiIgc3VyZmFWNlVHVpZ2h0PSIxIj48ZmVEaXN0YW50TGlnaHQgYXppbXV0aD0iNjAiIGVsZXZhdGlvbj0iNjAiLz48L2ZlRGlmZnVzZUxpZ2h0aW5nPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZmlsbD0iI2Y0ZjFlOCIgZmlsdGVyPSJ1cmwoI2EpIi8+PC9zdmc+');
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      height:100vh;
+      overflow:hidden;
+      user-select:none;
+      background:var(--bg-paper);
+      background-image:var(--paper-texture);
+      color:var(--ink);
+      font-family:"Yu Mincho", "Hiragino Mincho ProN", serif;
+      display:flex;
+      flex-direction:row;
+    }
+
+    /* --- Panels --- */
+    .panel{
+      width:260px;
+      height:100%;
+      padding:22px 18px;
+      background:var(--panel);
+      backdrop-filter:var(--blur);
+      border-right:1px solid var(--line);
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+      z-index:10;
+    }
+    .panel.right{
+      border-right:none;
+      border-left:1px solid var(--line);
+    }
+
+    .panel h1{
+      font-size:16px;
+      margin:0;
+      letter-spacing:.12em;
+      font-weight:700;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding-bottom:10px;
+      border-bottom:2px solid rgba(0,0,0,.55);
+    }
+
+    .hint{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.6;
+      margin-top:auto;
+    }
+
+    .box{
+      background:rgba(255,255,255,.65);
+      border:1px solid var(--line);
+      border-radius:8px;
+      padding:10px;
+    }
+
+    .row{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .row > *{ flex:1; }
+    .label{
+      font-size:11px;
+      color:var(--muted);
+      font-weight:700;
+      letter-spacing:.06em;
+      margin-bottom:6px;
+      display:flex;
+      justify-content:space-between;
+    }
+
+    input[type="text"]{
+      width:100%;
+      border:1px solid rgba(0,0,0,.2);
+      border-radius:6px;
+      padding:10px 10px;
+      font-family:inherit;
+      font-size:14px;
+      background:rgba(255,255,255,.9);
+    }
+
+    .toggle{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      font-size:12px;
+      color:var(--muted);
+    }
+    .toggle input{ transform:scale(1.1); }
+
+    input[type="range"]{
+      width:100%;
+    }
+
+    /* --- Mini charts --- */
+    .mini{
+      width:100%;
+      height:64px;
+      border-radius:8px;
+      background:#fff;
+      border:1px solid var(--line);
+    }
+    .wave{
+      width:100%;
+      height:140px;
+      border-radius:10px;
+      background:#fff;
+      border:1px solid var(--line);
+    }
+
+    /* --- Center stage --- */
+    .center{
+      flex:1;
+      position:relative;
+      display:flex;
+      flex-direction:column;
+      height:100vh;
+      overflow:hidden;
+    }
+
+    .stage{
+      flex:1;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      padding:28px 20px 10px;
+      overflow:hidden;
+    }
+
+    .char-container{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      padding:40px 24px;
+      transition:transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+      filter:none;
+    }
+    .char-container.finished{
+      filter:none; /* per-glyph material filter is applied to each .kana */
+    }
+
+    .kana-cage{
+      position:relative;
+      display:block;
+      height:125px;        /* JS will control */
+      width:220px;
+      border:none;
+      overflow:visible;
+      transition:height .1s linear, margin-bottom .8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .kana{
+      font-family:'LianmianVF', serif;
+      font-size:110px;
+      line-height:1.0;
+      color:#bbb;
+      mix-blend-mode:multiply;
+      font-feature-settings:"curs" 0;
+      white-space:nowrap;
+      transition:font-variation-settings .1s linear, top .2s ease, color .45s ease, transform .2s ease;
+      position:absolute;
+      top:-9px;
+      left:50%;
+      transform:translateX(-50%);
+      transform-origin:top center;
+    }
+    .kana.listening{
+      color:var(--seal);
+      opacity:1;
+      z-index:100;
+      transform:translateX(-50%) scale(1.06);
+    }
+    .kana.done{ color:var(--ink); }
+
+    /* --- Bottom controls (like screenshot) --- */
+    .bottom{
+      flex-shrink:0;
+      padding:18px 22px 22px;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+      align-items:center;
+      background:rgba(255,255,255,.25);
+      backdrop-filter: blur(12px);
+      border-top:1px solid var(--line);
+      z-index:50;
+    }
+    .phrase-row{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      justify-content:center;
+    }
+    .phrase{
+      border:1px solid rgba(0,0,0,.25);
+      background:#fff;
+      border-radius:4px;
+      padding:8px 16px;
+      font-family:inherit;
+      font-size:14px;
+      cursor:pointer;
+      transition:.2s;
+    }
+    .phrase:hover, .phrase.active{
+      background:#333;
+      color:#fff;
+      border-color:#333;
+    }
+
+    .btn-row{
+      display:flex;
+      gap:18px;
+      align-items:center;
+      justify-content:center;
+      padding-top:4px;
+    }
+    .pill{
+      border:none;
+      border-radius:999px;
+      padding:16px 58px;
+      font-size:18px;
+      font-weight:700;
+      letter-spacing:.06em;
+      color:#fff;
+      cursor:pointer;
+      transition:.25s cubic-bezier(0.25, 1, 0.5, 1);
+      box-shadow:0 10px 26px rgba(0,0,0,.12);
+    }
+    .pill:hover{ transform:translateY(-2px); }
+    .pill.red{ background:var(--seal); }
+    .pill.green{ background:var(--ok); }
+    .pill.recording{
+      animation:pulse 1.5s infinite;
+      box-shadow:0 10px 26px rgba(201,58,64,.25);
+    }
+    @keyframes pulse{
+      0%{ transform:scale(1); }
+      50%{ transform:scale(.98); opacity:.88; }
+      100%{ transform:scale(1); }
+    }
+    .status{
+      font-size:13px;
+      color:#555;
+      font-weight:700;
+      letter-spacing:.06em;
+    }
+
+    /* Responsive: hide side panels on very small screens */
+    @media (max-width: 980px){
+      .panel{ display:none; }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- filters -->
+  <svg width="0" height="0" style="position:absolute;">
+    <defs>
+      <filter id="ink-flow">
+        <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" result="noise" />
+        <feDisplacementMap id="filter-disp" in="SourceGraphic" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G" />
+        <feGaussianBlur id="filter-blur" stdDeviation="0" />
+      </filter>
+      <!-- per-glyph ink material filters will be injected here -->
+      <g id="ink-material-defs"></g>
+    </defs>
+  </svg>
+
+  <!-- LEFT -->
+  <aside class="panel left">
+    <h1>可変フォント <span style="font-size:11px;color:#888;letter-spacing:.08em;"></span></h1>
+
+    <div class="box">
+      <div class="label"><span>文字列</span><span id="len-ind">0文字</span></div>
+      <input id="txt-input" type="text" value="ありがとう" />
+      <div class="toggle" style="margin-top:10px;">
+        <input id="auto-mode" type="checkbox" checked />
+        <label for="auto-mode">音声→自動変換（ピーク保持）</label>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="label"><span>接続 Sets（感度）</span><span id="sens-val">0.03</span></div>
+      <input id="sens" type="range" min="0.01" max="0.12" step="0.005" value="0.03" />
+      <div style="font-size:11px;color:#777;line-height:1.5;margin-top:8px;">
+        低いほど小声でも反応（ノイズも拾いやすい）
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="label"><span>軸の変化（文字ごとのピーク）</span><span style="color:#999">wght / wdth / HGHT / LNK1</span></div>
+      <canvas class="mini" id="mini-wght"></canvas>
+      <canvas class="mini" id="mini-wdth" style="margin-top:10px;"></canvas>
+      <canvas class="mini" id="mini-hght" style="margin-top:10px;"></canvas>
+      <canvas class="mini" id="mini-link" style="margin-top:10px;"></canvas>
+    </div>
+
+    <div class="hint">
+      <p><strong>操作</strong></p>
+      <p>ボタンを<strong>長押し</strong>して発声し、<strong>離したあと</strong>に録音を解析して各文字へ反映します。（無音で自動分割し、足りない場合は音量の谷で補完）</p>
+    </div>
+  </aside>
+
+  <!-- CENTER -->
+  <main class="center">
+    <div class="stage">
+      <div class="char-container" id="main-container"></div>
+    </div>
+
+    <div class="bottom">
+      <div class="status" id="status">準備完了</div>
+
+      <div class="phrase-row" id="phrase-row">
+        <button class="phrase active" data-text="ありがとう">ありがとう</button>
+        <button class="phrase" data-text="いただきます">いただきます</button>
+        <button class="phrase" data-text="おめでとう">おめでとう</button>
+        <button class="phrase" data-text="おねがいします">おねがいします</button>
+        <button class="phrase" data-text="さよなら">さよなら</button>
+      </div>
+
+      <div class="btn-row">
+        <button class="pill red" id="btn-reset">書き直し</button>
+        <button class="pill green" id="btn-record" aria-label="長押しで録音">長押し録音</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- RIGHT -->
+  <aside class="panel right">
+    <h1>声分析 <span style="font-size:11px;color:#888;letter-spacing:.08em;">monitor</span></h1>
+
+    <div class="box">
+      <div class="label"><span>音波</span><span id="sr-ind">—</span></div>
+      <canvas class="wave" id="wave"></canvas>
+    </div>
+
+    <div class="box">
+      <div class="label"><span>音量 Volume</span><span id="v-ind">0</span></div>
+      <canvas class="mini" id="m-vol"></canvas>
+      <div class="label" style="margin-top:12px;"><span>音高 Pitch</span><span id="p-ind">— Hz</span></div>
+      <canvas class="mini" id="m-pitch"></canvas>
+      <div class="label" style="margin-top:12px;"><span>音色 Timbre</span><span id="t-ind">—</span></div>
+      <canvas class="mini" id="m-timbre"></canvas>
+      <div class="label" style="margin-top:12px;"><span>音長 Duration</span><span id="d-ind">— ms</span></div>
+      <canvas class="mini" id="m-dur"></canvas>
+      <div class="label" style="margin-top:12px;"><span>ポーズ Pause</span><span id="z-ind">— ms</span></div>
+      <canvas class="mini" id="m-pause"></canvas>
+    </div>
+
+    <div class="hint">
+      
+    </div>
+  </aside>
+
+<script>
+/* =========================================================
+   Hold-to-record → release-to-apply typography
+   - While holding: show live monitors (wave/vol/pitch/timbre)
+   - On release: decode recorded audio, auto-split by silence,
+     compute per-segment features, then update each glyph.
+   - Connect glyphs but avoid overlap (auto spacing adjust).
+   ========================================================= */
+
+const PARAMETERS = {
+  topOffset: -9,
+  minBoxHeight: 125,
+  maxBoxHeight: 291,
+
+  // Layout constraints
+  // Keep "字距=0" (no extra gap) and ensure glyphs do NOT overlap.
+  // Tail→head continuity is achieved by keeping the gap ~0px and letting
+  // the LNK1 stroke do the linking (instead of negative overlaps).
+  desiredGapPx: 0,
+  desiredGapMaxPx: 7.2,
+  allowedOverlapPx: 0,
+
+  fontTags: { wght: "wght", wdth: "wdth", hght: "HGHT", lnk: "LNK1" },
+  pitchRange: [100, 350],
+
+  // offline splitting
+  frameMs: 10,
+  minSegMs: 90,
+  silenceMs: 320,
+
+  // mora-like segmentation (peak/onset based)
+  moraPeakMinDistMs: 120,
+  moraProminence: 0.06,
+  moraMaxSearchTries: 7
+};
+
+// --- Axis ranges ---
+// We keep LNK1 as-is (it already feels good), but calibrate WDTH/HGHT to the font so changes are visible.
+// WGHT is assumed to behave like a normal weight axis (100..900) for best visual contrast.
+let AXIS_RANGE = {
+  wght: [100, 900],
+  wdth: [800, 1200],  // will be auto-calibrated if possible
+  hght: [640, 1420],  // will be auto-calibrated if possible
+  lnk:  [0, 1000]
+};
+let axisCalibrated = false;
+
+function lerp(a,b,t){ return a + (b-a)*t; }
+
+// Try to detect a usable min/max for WDTH (width) and HGHT (height) by measuring a hidden glyph.
+// This avoids the common issue "values are changing but the font clamps so you can't see it".
+async function calibrateAxisRanges(){
+  if(axisCalibrated) return;
+  axisCalibrated = true;
+
+  // Wait for the font to be available (best effort)
+  try{
+    if(document.fonts && document.fonts.load){
+      await document.fonts.load('48px "LianmianVF"');
+    }
+  }catch(_){}
+
+  const test = document.createElement("span");
+  test.textContent = "あ";
+  test.style.position = "absolute";
+  test.style.left = "-9999px";
+  test.style.top = "-9999px";
+  test.style.fontFamily = "'LianmianVF', serif";
+  test.style.fontSize = "160px";
+  test.style.lineHeight = "1";
+  test.style.whiteSpace = "nowrap";
+  document.body.appendChild(test);
+
+  const CAND = [-2000,-1200,-800,-400,0,50,100,200,400,600,800,900,1000,1100,1200,1400,1600,2000];
+
+  function measureFor(tag, val){
+    const w = 500, d = 1000, h = 900, l = 0;
+    const vv = { wght:w, wdth:d, hght:h, lnk:l };
+    vv[tag] = val;
+    test.style.fontVariationSettings =
+      `"${PARAMETERS.fontTags.wght}" ${vv.wght}, "${PARAMETERS.fontTags.wdth}" ${vv.wdth}, "${PARAMETERS.fontTags.hght}" ${vv.hght}, "${PARAMETERS.fontTags.lnk}" ${vv.lnk}`;
+    const r = test.getBoundingClientRect();
+    return { w:r.width, h:r.height };
+  }
+
+  function pickRange(tag, dim){
+    let bestMin = null, bestMax = null;
+    let minS = Infinity, maxS = -Infinity;
+
+    for(const v of CAND){
+      const m = measureFor(tag, v);
+      const s = (dim === "w") ? m.w : m.h;
+      if(s < minS){ minS = s; bestMin = v; }
+      if(s > maxS){ maxS = s; bestMax = v; }
+    }
+
+    // If no measurable difference, keep defaults
+    if(!Number.isFinite(minS) || !Number.isFinite(maxS) || Math.abs(maxS-minS) < 0.5){
+      return null;
+    }
+
+    // Ensure ascending
+    if(bestMin > bestMax){
+      const t = bestMin; bestMin = bestMax; bestMax = t;
+    }
+    return [bestMin, bestMax];
+  }
+
+  // Calibrate WDTH (width) and HGHT (height)
+  const wd = pickRange("wdth", "w");
+  if(wd) AXIS_RANGE.wdth = wd;
+
+  const hg = pickRange("hght", "h");
+  if(hg) AXIS_RANGE.hght = hg;
+
+  // LNK1 calibration is not needed (you said it is good), keep it fixed.
+
+  document.body.removeChild(test);
+}
+
+
+let ctx, analyser, timeData, freqData;
+let streamRef = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let isHolding = false;
+let rafId = null;
+
+let charsDOM = [];
+let peakData = [];
+let voiceMode = "normal";   // quiet | normal | loud (sentence-level)
+let voiceGain = 1.0;        // applied to wght/wdth/HGHT only (display-oriented)
+
+let durRefMs = 900; // per-recording duration reference for LNK1 normalization
+let currentText = "ありがとう";
+
+const els = {
+  container: document.getElementById("main-container"),
+  status: document.getElementById("status"),
+  txt: document.getElementById("txt-input"),
+  len: document.getElementById("len-ind"),
+  auto: document.getElementById("auto-mode"),
+  sens: document.getElementById("sens"),
+  sensVal: document.getElementById("sens-val"),
+  btnRec: document.getElementById("btn-record"),
+  btnReset: document.getElementById("btn-reset"),
+  phraseRow: document.getElementById("phrase-row"),
+
+  sr: document.getElementById("sr-ind"),
+  vInd: document.getElementById("v-ind"),
+  pInd: document.getElementById("p-ind"),
+  tInd: document.getElementById("t-ind"),
+  dInd: document.getElementById("d-ind"),
+  zInd: document.getElementById("z-ind"),
+
+  disp: document.getElementById("filter-disp"),
+  blur: document.getElementById("filter-blur"),
+
+  cMiniW: document.getElementById("mini-wght"),
+  cMiniWd: document.getElementById("mini-wdth"),
+  cMiniH: document.getElementById("mini-hght"),
+  cMiniL: document.getElementById("mini-link"),
+
+  cWave: document.getElementById("wave"),
+  cV: document.getElementById("m-vol"),
+  cP: document.getElementById("m-pitch"),
+  cT: document.getElementById("m-timbre"),
+  cD: document.getElementById("m-dur"),
+  cZ: document.getElementById("m-pause"),
+};
+
+// --- history buffers for monitors ---
+const HIST_N = 140;
+const hist = {
+  vol: new Array(HIST_N).fill(0),
+  pitch: new Array(HIST_N).fill(0),
+  timbre: new Array(HIST_N).fill(0),
+  dur: new Array(HIST_N).fill(0),
+  pause: new Array(HIST_N).fill(0),
+};
+
+function clamp(v, mn, mx){ return Math.min(Math.max(v, mn), mx); }
+function map(v,i1,i2,o1,o2){ return o1 + (o2-o1) * ((v-i1)/(i2-i1)); }
+function pushHist(arr, v){ arr.push(v); if(arr.length>HIST_N) arr.shift(); }
+
+function ensureCanvasSize(c){
+  const dpr = window.devicePixelRatio || 1;
+  const rect = c.getBoundingClientRect();
+  const w = Math.max(2, Math.floor(rect.width * dpr));
+  const h = Math.max(2, Math.floor(rect.height * dpr));
+  if(c.width !== w || c.height !== h){
+    c.width = w; c.height = h;
+  }
+  return dpr;
+}
+function drawArea(canvas, arr){
+  const ctx2 = canvas.getContext("2d");
+  const dpr = ensureCanvasSize(canvas);
+  const w = canvas.width, h = canvas.height;
+  ctx2.clearRect(0,0,w,h);
+
+  ctx2.strokeStyle = "rgba(0,0,0,.12)";
+  ctx2.lineWidth = 1 * dpr;
+  ctx2.beginPath();
+  ctx2.moveTo(0, h-1*dpr);
+  ctx2.lineTo(w, h-1*dpr);
+  ctx2.stroke();
+
+  ctx2.fillStyle = "rgba(0,0,0,.92)";
+  ctx2.beginPath();
+  const n = arr.length;
+  for(let i=0;i<n;i++){
+    const x = (i/(n-1))*w;
+    const y = h - (arr[i])*h;
+    if(i===0) ctx2.moveTo(x,y);
+    else ctx2.lineTo(x,y);
+  }
+  ctx2.lineTo(w,h);
+  ctx2.lineTo(0,h);
+  ctx2.closePath();
+  ctx2.fill();
+}
+function drawPolyline(canvas, arr, normalize=true){
+  const g = canvas.getContext("2d");
+  const dpr = ensureCanvasSize(canvas);
+  const w = canvas.width, h = canvas.height;
+  g.clearRect(0,0,w,h);
+
+  g.strokeStyle = "rgba(0,0,0,.08)";
+  g.lineWidth = 1*dpr;
+  g.beginPath();
+  g.moveTo(0, h*0.33); g.lineTo(w, h*0.33);
+  g.moveTo(0, h*0.66); g.lineTo(w, h*0.66);
+  g.stroke();
+
+  let vals = arr.slice();
+  if(normalize){
+    let mn = Math.min(...vals), mx = Math.max(...vals);
+    if(mx-mn < 1e-6){ mx = mn+1; }
+    vals = vals.map(v => (v-mn)/(mx-mn));
+  }else{
+    vals = vals.map(v => clamp(v,0,1));
+  }
+
+  g.strokeStyle = "rgba(0,0,0,.9)";
+  g.lineWidth = 2*dpr;
+  g.beginPath();
+  for(let i=0;i<vals.length;i++){
+    const x = vals.length===1 ? w/2 : (i/(vals.length-1))*w;
+    const y = h - vals[i]*h;
+    if(i===0) g.moveTo(x,y);
+    else g.lineTo(x,y);
+  }
+  g.stroke();
+}
+function drawWave(canvas, timeDomain){
+  const g = canvas.getContext("2d");
+  const dpr = ensureCanvasSize(canvas);
+  const w = canvas.width, h = canvas.height;
+  g.clearRect(0,0,w,h);
+
+  g.fillStyle = "rgba(255,255,255,1)";
+  g.fillRect(0,0,w,h);
+
+  g.strokeStyle = "rgba(0,0,0,.15)";
+  g.lineWidth = 1*dpr;
+  g.beginPath();
+  g.moveTo(0,h/2); g.lineTo(w,h/2);
+  g.stroke();
+
+  g.strokeStyle = "rgba(0,0,0,.9)";
+  g.lineWidth = 1.6*dpr;
+  g.beginPath();
+
+  const n = timeDomain.length;
+  for(let i=0;i<n;i++){
+    const x = (i/(n-1))*w;
+    const v = (timeDomain[i]-128)/128;
+    const y = h/2 + v*(h*0.40);
+    if(i===0) g.moveTo(x,y);
+    else g.lineTo(x,y);
+  }
+  g.stroke();
+}
+
+/* ---------- Typography ---------- */
+async function initText(text){
+  // Best-effort axis calibration so WDTH/HGHT changes are visible
+  calibrateAxisRanges();
+  currentText = text;
+  const chars = Array.from(text);
+  els.len.textContent = `${chars.length}文字`;
+
+  els.container.innerHTML = "";
+  els.container.classList.remove("finished");
+  els.blur.setAttribute("stdDeviation","0");
+  els.disp.setAttribute("scale","0");
+  els.container.style.transform = "scale(1)";
+
+  charsDOM = [];
+  peakData = new Array(chars.length).fill(null).map(()=>({ vol:0.10, pitch:150, dur:0, timbre:0.2, pause:0, _targetMargin:0 }));
+
+  for(let i=0;i<chars.length;i++){
+    const cage = document.createElement("div");
+    cage.className = "kana-cage";
+    cage.style.zIndex = 100 - i;
+
+    const span = document.createElement("span");
+    span.className = "kana";
+    span.textContent = chars[i];
+    span.style.top = PARAMETERS.topOffset + "px";
+    span.style.fontVariationSettings = `"${PARAMETERS.fontTags.wght}" 500, "${PARAMETERS.fontTags.wdth}" 1000, "${PARAMETERS.fontTags.hght}" 692, "${PARAMETERS.fontTags.lnk}" 0`;
+
+    cage.appendChild(span);
+    els.container.appendChild(cage);
+    charsDOM.push({ cage, text: span });
+  }
+
+  refreshLayout(false);
+  // default state: plain clean text (no spray)
+  resetMaterialToPlain();
+  // default state: no spray material
+  charsDOM.forEach(c=>{ if(c && c.text){ c.text.style.filter="none"; c.text.style.opacity="1"; }});
+  // Prepare per-glyph material filters (defaults)
+  redrawLeftCharts();
+}
+
+
+function computeFontForIndex(i){
+  const n = peakData.length || 1;
+  const voiceGain = (window.voiceGain ?? 1.0);
+  const d = peakData[i] || {vol:.1, pitch:150, dur:0};
+
+  // Use separation-enhanced (rank-spread) values when available.
+  const v01raw = clamp((d.vol ?? 0.10), 0, 1);
+  const p01raw = clamp(((d.pitch - PARAMETERS.pitchRange[0]) / (PARAMETERS.pitchRange[1]-PARAMETERS.pitchRange[0])), 0, 1);
+
+  const vR = clamp((d.volS01 ?? v01raw), 0, 1);
+  const pR = clamp((d.pitchS01 ?? p01raw), 0, 1);
+  const u01 = clamp((d.durS01 ?? (d.dur / durRefMs)), 0, 1);
+
+  // Stronger contrast so each mora/char looks clearly different even if the raw differences are small.
+  const vC = clamp(0.5 + (vR - 0.5) * 5.0, 0, 1);
+  const pC = clamp(0.5 + (pR - 0.5) * 5.4, 0, 1);
+
+  // Non-linear emphasis (push highs higher, lows lower)
+  const vNL = Math.pow(Math.max(vC, 0.001), 0.22);
+  const pNL = Math.pow(Math.max(pC, 0.001), 0.42);
+
+  // Tiny deterministic jitter per char so "wght / wdth / HGHT" won't collapse to the same value.
+  // (Still respects the overall vol/pitch ordering.)
+  const j = (n <= 1) ? 0 : ((i/(n-1)) - 0.5) * 0.10;
+
+  // Axis mapping (use calibrated WDTH/HGHT ranges; WGHT uses 100..900 for visible weight change)
+  const wght = lerp(AXIS_RANGE.wght[0], AXIS_RANGE.wght[1], clamp((vNL + j*0.35) * voiceGain, 0, 1));
+
+  // wdth also follows volume, but lightly mixes pitch so each char is more distinguishable.
+  const wdMix = clamp((vNL + j*0.35) * voiceGain, 0, 1);
+  const wdth = lerp(AXIS_RANGE.wdth[0], AXIS_RANGE.wdth[1], wdMix);
+
+  const hght = lerp(AXIS_RANGE.hght[0], AXIS_RANGE.hght[1], clamp((pNL + j*0.25) * voiceGain, 0, 1));
+
+  // Keep LNK1 behavior as-is (you said it already feels good)
+  const uNL = Math.pow(u01, 0.52);
+  // cache for adaptive spacing
+  if(peakData[i]) peakData[i]._uNL = uNL;
+  const lnk  = lerp(AXIS_RANGE.lnk[0], AXIS_RANGE.lnk[1], uNL);
+
+  // Cage height: keep 字距=0 and avoid overlap by tuning advance height.
+  // IMPORTANT: do NOT expand spacing just because LNK1 grows.
+  // We start from a compact baseline and only add a SMALL amount from dur/link.
+  // Final "no-overlap / gap≈0" is handled by adjustNoOverlap().
+  let boxHeight = PARAMETERS.minBoxHeight;
+
+  // HGHT tends to increase vertical extent; compensate a bit so it won't overlap,
+  // but keep it compact so the tail/head still connects.
+  boxHeight += (hght - AXIS_RANGE.hght[0]) * 0.14;
+
+  // Keep LNK1-driven spacing minimal (user request): small additive only.
+  boxHeight += (8 * uNL) + (52 * uNL * uNL);
+
+  // Tighter cap: prevents huge gaps when LNK1 is large.
+  boxHeight = clamp(boxHeight, PARAMETERS.minBoxHeight, PARAMETERS.maxBoxHeight * 1.25);
+
+  return { wght, wdth, hght, lnk, boxHeight, boxWidth: boxHeight*0.8 };
+}
+
+function refreshLayout(doneState){
+  for(let i=0;i<charsDOM.length;i++){
+    const item = charsDOM[i];
+    const f = computeFontForIndex(i);
+
+    item.text.style.fontVariationSettings =
+      `"${PARAMETERS.fontTags.wght}" ${f.wght}, "${PARAMETERS.fontTags.wdth}" ${f.wdth}, "${PARAMETERS.fontTags.hght}" ${f.hght}, "${PARAMETERS.fontTags.lnk}" ${f.lnk}`;
+
+    item.cage.style.height = f.boxHeight + "px";
+    item.cage.style.width  = f.boxWidth + "px";
+
+    // Keep spacing = 0 (no additional gap). Continuity relies on LNK1 stroke.
+    item.cage.style.marginBottom = "0px";
+    if(doneState){ item.text.classList.add("done"); }
+    else { item.text.classList.remove("done"); item.text.style.filter = "none"; }
+  }
+
+  if(doneState){
+    requestAnimationFrame(()=> {
+      adjustNoOverlap();
+      redrawLeftCharts();
+    });
+  }
+}
+
+function adjustNoOverlap(){
+  // No negative overlaps. Keep gap ~0 for connection, but add *adaptive* breathing room
+  // when LNK1 is large (otherwise strokes may collide).
+  const dpr = (window.devicePixelRatio || 1);
+  const allowedOverlap = (PARAMETERS.allowedOverlapPx || 0) * dpr;
+
+  function desiredGapFor(i){
+    const u = clamp((peakData[i]?._uNL ?? 0), 0, 1); // 0..1
+    const base = (PARAMETERS.desiredGapPx || 0);
+    const extra = (PARAMETERS.desiredGapMaxPx || 0) * (u*u); // only grows when LNK1 is large
+    return (base + extra) * dpr;
+  }
+
+  for(let iter=0; iter<7; iter++){
+    for(let i=0;i<charsDOM.length-1;i++){
+      const desiredGap = desiredGapFor(i);
+      const upper = charsDOM[i];
+      const lower = charsDOM[i+1];
+
+      const a = upper.text.getBoundingClientRect();
+      const b = lower.text.getBoundingClientRect();
+      const gap = b.top - a.bottom; // positive = space, negative = overlap
+
+      let h = parseFloat(upper.cage.style.height || "0");
+      if(!Number.isFinite(h) || h<=0) h = PARAMETERS.minBoxHeight;
+
+      if(gap < -allowedOverlap){
+        // overlap: increase height to push next glyph down
+        h += (-gap) + desiredGap + 1;
+      }else if(gap > desiredGap + 1){
+        // too much gap: reduce height to pull next glyph up (limit shrink so it stays stable)
+        h -= Math.min(gap - desiredGap, 10);
+      }
+
+      h = clamp(h, PARAMETERS.minBoxHeight, PARAMETERS.maxBoxHeight * 1.6);
+      upper.cage.style.height = `${h}px`;
+      upper.cage.style.width  = `${h*0.8}px`;
+    }
+  }
+}
+
+
+function finishAndSnap(){
+  refreshLayout(true);
+  updateInkMaterials();
+  // Apply ink material layer (timbre -> roughness/bleed)
+  els.container.classList.add("finished");
+  els.blur.setAttribute("stdDeviation","0.8");
+  els.disp.setAttribute("scale","2");
+
+  setTimeout(()=>{
+    const scale = (window.innerHeight * 0.75) / els.container.offsetHeight;
+    els.container.style.transform = `scale(${Math.min(scale, 1.2)})`;
+    const modeLabel2 = (window.voiceMode==="quiet")?"小声":(window.voiceMode==="loud")?"大声":"普通";
+    els.status.textContent = `完成（${modeLabel2}）`;
+    els.btnRec.textContent = "長押し録音";
+    els.btnRec.classList.remove("recording");
+  }, 450);
+}
+
+function redrawLeftCharts(){
+  // Mirror the same mapping used in computeFontForIndex so the mini charts
+  // reflect the actual axis values applied to each character.
+  const w = peakData.map(d => {
+    const v = clamp(Math.max(d.vol, 0.03), 0, 1);
+    const vExp = Math.pow(v, 0.55);
+    return lerp(AXIS_RANGE.wght[0], AXIS_RANGE.wght[1], vExp);
+  });
+  const wd = peakData.map(d => {
+    const v = clamp(Math.max(d.vol, 0.03), 0, 1);
+    const vExp = Math.pow(v, 0.55);
+    return lerp(AXIS_RANGE.wdth[0], AXIS_RANGE.wdth[1], vExp);
+  });
+  const h = peakData.map(d => {
+    const p01 = clamp((d.pitch - PARAMETERS.pitchRange[0]) / (PARAMETERS.pitchRange[1]-PARAMETERS.pitchRange[0]), 0, 1);
+    const pC  = clamp(0.5 + (p01 - 0.5) * 1.75, 0, 1);
+    return lerp(AXIS_RANGE.hght[0], AXIS_RANGE.hght[1], pC);
+  });
+  const l = peakData.map(d => {
+    const u01 = clamp(d.dur / durRefMs, 0, 1);
+    const uExp = Math.pow(u01, 0.65);
+    return map(uExp, 0, 1, 0, 1000);
+  });
+  drawPolyline(els.cMiniW, w, true);
+  if(els.cMiniWd) drawPolyline(els.cMiniWd, wd, true);
+  drawPolyline(els.cMiniH, h, true);
+  drawPolyline(els.cMiniL, l, true);
+}
+
+
+/* ---------- Rendering layer (材質層): ink feel driven by timbre ---------- */
+function ensureInkMaterialFilters(n){
+  const host = document.getElementById("ink-material-defs");
+  if(!host) return;
+  for(let i=0;i<n;i++){
+    if(document.getElementById(`ink-${i}`)) continue;
+
+    const f = document.createElementNS("http://www.w3.org/2000/svg","filter");
+    f.setAttribute("id", `ink-${i}`);
+    f.setAttribute("x","-20%"); f.setAttribute("y","-20%");
+    f.setAttribute("width","140%"); f.setAttribute("height","140%");
+
+    const turb = document.createElementNS("http://www.w3.org/2000/svg","feTurbulence");
+    turb.setAttribute("type","fractalNoise");
+    turb.setAttribute("baseFrequency","0.012");
+    turb.setAttribute("numOctaves","3");
+    turb.setAttribute("seed", String((i*97)%997));
+    turb.setAttribute("result","noise");
+
+    // Frost / grain mask (matte + fade), driven by timbre later
+    const turb2 = document.createElementNS("http://www.w3.org/2000/svg","feTurbulence");
+    turb2.setAttribute("type","fractalNoise");
+    turb2.setAttribute("baseFrequency","0.9");
+    turb2.setAttribute("numOctaves","1");
+    turb2.setAttribute("seed", String((i*131)%997));
+    turb2.setAttribute("result","grain");
+
+    // Convert grain luminance into alpha mask
+    const alphaMat = document.createElementNS("http://www.w3.org/2000/svg","feColorMatrix");
+    alphaMat.setAttribute("in","grain");
+    alphaMat.setAttribute("type","matrix");
+    // Put luminance-ish into alpha channel
+    alphaMat.setAttribute("values",
+      "0 0 0 0 0  " +
+      "0 0 0 0 0  " +
+      "0 0 0 0 0  " +
+      "0.6 0.3 0.1 0 0");
+    alphaMat.setAttribute("result","grainA");
+
+    // Shape the alpha (more holes / matte when timbre is high)
+    const alphaShaper = document.createElementNS("http://www.w3.org/2000/svg","feComponentTransfer");
+    alphaShaper.setAttribute("in","grainA");
+    alphaShaper.setAttribute("result","grainAS");
+    const aFunc = document.createElementNS("http://www.w3.org/2000/svg","feFuncA");
+    aFunc.setAttribute("type","gamma");
+    aFunc.setAttribute("amplitude","1");
+    aFunc.setAttribute("exponent","1.2");
+    aFunc.setAttribute("offset","0");
+    alphaShaper.appendChild(aFunc);
+
+    // Apply alpha mask to the source to get frosted/sandy edges
+    const matte = document.createElementNS("http://www.w3.org/2000/svg","feComposite");
+    matte.setAttribute("in","SourceGraphic");
+    matte.setAttribute("in2","grainAS");
+    matte.setAttribute("operator","in");
+    matte.setAttribute("result","matteSrc");
+
+
+    const disp = document.createElementNS("http://www.w3.org/2000/svg","feDisplacementMap");
+    disp.setAttribute("in","matteSrc");
+    disp.setAttribute("in2","noise");
+    disp.setAttribute("scale","1.2");
+    disp.setAttribute("xChannelSelector","R");
+    disp.setAttribute("yChannelSelector","G");
+    disp.setAttribute("result","displaced");
+
+    const blur = document.createElementNS("http://www.w3.org/2000/svg","feGaussianBlur");
+    blur.setAttribute("in","displaced");
+    blur.setAttribute("stdDeviation","0.10");
+    blur.setAttribute("result","bleed");
+
+    const ct = document.createElementNS("http://www.w3.org/2000/svg","feComponentTransfer");
+    ct.setAttribute("in","bleed");
+    const fR = document.createElementNS("http://www.w3.org/2000/svg","feFuncR");
+    const fG = document.createElementNS("http://www.w3.org/2000/svg","feFuncG");
+    const fB = document.createElementNS("http://www.w3.org/2000/svg","feFuncB");
+    const fA = document.createElementNS("http://www.w3.org/2000/svg","feFuncA");
+    fR.setAttribute("type","gamma"); fR.setAttribute("amplitude","1"); fR.setAttribute("exponent","1.10"); fR.setAttribute("offset","0");
+    fG.setAttribute("type","gamma"); fG.setAttribute("amplitude","1"); fG.setAttribute("exponent","1.10"); fG.setAttribute("offset","0");
+    fB.setAttribute("type","gamma"); fB.setAttribute("amplitude","1"); fB.setAttribute("exponent","1.10"); fB.setAttribute("offset","0");
+    fA.setAttribute("type","gamma"); fA.setAttribute("amplitude","1"); fA.setAttribute("exponent","1.00"); fA.setAttribute("offset","0");
+    ct.appendChild(fR); ct.appendChild(fG); ct.appendChild(fB); ct.appendChild(fA);
+
+    const merge = document.createElementNS("http://www.w3.org/2000/svg","feMerge");
+    const m1 = document.createElementNS("http://www.w3.org/2000/svg","feMergeNode");
+    m1.setAttribute("in","bleed");
+    const m2 = document.createElementNS("http://www.w3.org/2000/svg","feMergeNode");
+    m2.setAttribute("in","SourceGraphic");
+    merge.appendChild(m1); merge.appendChild(m2);
+
+    f.appendChild(turb);
+
+    f.appendChild(turb2);
+    f.appendChild(alphaMat);
+    f.appendChild(alphaShaper);
+    f.appendChild(matte);
+    f.appendChild(disp);
+    f.appendChild(blur);
+    f.appendChild(ct);
+    f.appendChild(merge);
+
+    host.appendChild(f);
+  }
+}
+
+function applyInkMaterialToGlyph(i, t01, v01){
+  const f = document.getElementById(`ink-${i}`);
+  if(!f) return;
+
+  const turb = f.querySelector("feTurbulence"); // noise for edge displacement
+  const turb2 = f.querySelectorAll("feTurbulence")[1]; // grain for matte/frost
+  const disp = f.querySelector("feDisplacementMap");
+  const blur = f.querySelector("feGaussianBlur");
+  const aFunc = f.querySelector("feComponentTransfer[in='grainA'] feFuncA") || f.querySelector("feComponentTransfer feFuncA");
+  const funcs = f.querySelectorAll("feComponentTransfer feFuncR, feComponentTransfer feFuncG, feComponentTransfer feFuncB");
+
+  const t = clamp(t01, 0, 1);
+  const v = clamp(v01 ?? 0.5, 0, 1);
+  // Exhibition emphasis: loud+clear => very black & clean, quiet+hoarse => pencil gray & sandy
+  const rough = clamp(0.85*t + 0.65*(1 - v), 0, 1);
+// Density: depends on BOTH clarity and volume
+  let density = clamp((v*0.95 + 0.20) * (1.0 - t*0.65), 0, 1);
+  const mode = window.voiceMode || 'normal';
+  if(mode==='loud')  density = clamp(density * 1.12, 0, 1);
+  if(mode==='quiet') density = clamp(density * 0.88, 0, 1);
+const baseFreq = lerp(0.008, 0.030, rough);
+  const dispScale = lerp(0.2, 18.0, Math.pow(rough, 1.1));
+  const bleed = lerp(0.002, 2.4, Math.pow(rough, 1.3));
+
+  // Frost / matte: more grain + more fade when timbre is high
+  const grainFreq = lerp(3.0, 0.25, Math.pow(rough, 1.0));              // high rough -> larger sand grains
+  const grainShape = lerp(4.2, 0.45, Math.pow(rough, 1.1)); // high rough -> more "holes" (matte)
+  const fadeAlpha = lerp(1.25, 0.10, Math.pow(rough, 1.2)); // high rough -> lighter overall
+
+  turb && turb.setAttribute("baseFrequency", baseFreq.toFixed(4));
+  disp && disp.setAttribute("scale", dispScale.toFixed(2));
+  blur && blur.setAttribute("stdDeviation", bleed.toFixed(2));
+
+  const exp = lerp(1.85, 0.65, Math.pow(rough, 1.0));
+  funcs.forEach(fn=> fn.setAttribute("exponent", exp.toFixed(2)));
+
+  // Push blacks darker when rough is low (clear & loud): amplitude>1 and negative offset deepen ink
+  const amp = lerp(1.85, 1.15, Math.pow(rough, 0.9));
+  const off = lerp(-0.08, -0.02, Math.pow(rough, 1.0));
+  funcs.forEach(fn=>{
+    fn.setAttribute("amplitude", amp.toFixed(2));
+    fn.setAttribute("offset", off.toFixed(2));
+  });
+
+  // Update grain mask controls
+  turb2 && turb2.setAttribute("baseFrequency", grainFreq.toFixed(3));
+  aFunc && aFunc.setAttribute("exponent", grainShape.toFixed(2));
+
+  const glyph = charsDOM[i]?.text;
+  if(glyph){
+    glyph.style.filter = `url(#ink-${i})`;
+    const opa = clamp(fadeAlpha, 0.25, 1.0);
+    glyph.style.opacity = opa.toFixed(3);
+  }
+}
+
+function updateInkMaterials(){
+  ensureInkMaterialFilters(charsDOM.length);
+
+  // sentence-level volume (median)
+  const vols = peakData.map(d=>clamp(d.vol ?? 0.0, 0, 1)).sort((a,b)=>a-b);
+  const v = vols.length ? vols[Math.floor(vols.length/2)] : 0;
+
+  // thresholds (updated)
+  const BLACK_TH = 1.00;   // >= pure black, no spray
+  const SPRAY_STRONG_TH = 0.60; // <= strong spray + light
+  const SPRAY_LIGHT_TH = 1.00;  // 0.6~1.0 gray + slight spray
+
+  // Spray density (sentence-level)
+  let ones = 0;
+  if(v <= SPRAY_STRONG_TH){
+    // strong spray
+    ones = 8;
+  }else if(v < SPRAY_LIGHT_TH){
+    // gradual decrease 0.6 -> 1.0  (many -> few)
+    const t = (v - SPRAY_STRONG_TH) / (SPRAY_LIGHT_TH - SPRAY_STRONG_TH); // 0..1
+    ones = Math.round(8 - t*6); // 8..2
+  }else{
+    ones = 0;
+  }
+
+  const vals = Array(10).fill(0).map((_,k)=> (k >= (10-ones) ? 1 : 0)).join(" ");
+  for(let i=0;i<charsDOM.length;i++){
+    const f = document.getElementById(`ink-${i}`);
+    const a = f ? f.querySelector(".sprayA") : null;
+    if(a) a.setAttribute("tableValues", vals);
+  }
+
+  for(let i=0;i<charsDOM.length;i++){
+    const g = charsDOM[i].text;
+    if(!g) continue;
+
+    if(v >= BLACK_TH){
+      g.style.filter = "none";
+      g.style.opacity = "1";
+    }else{
+      // gray by volume
+      const opa = clamp(0.18 + v*1.35, 0.18, 0.95);
+      g.style.opacity = opa.toFixed(3);
+
+      if(v < SPRAY_LIGHT_TH){
+        g.style.filter = `url(#ink-${i})`;
+      }else{
+        g.style.filter = "none";
+      }
+    }
+  }
+}
+
+
+
+
+function resetMaterialToPlain(){
+  if(!Array.isArray(charsDOM)) return;
+  charsDOM.forEach(c=>{
+    if(c && c.text){
+      c.text.style.filter = "none";
+      c.text.style.opacity = "1";
+    }
+  });
+}
+
+
+/* ---------- Rendering layer (材質層): Spray Ink (stable) ---------- */
+function ensureInkMaterialFilters(n){
+  const host = document.getElementById("ink-material-defs");
+  if(!host) return;
+  for(let i=0;i<n;i++){
+    if(document.getElementById(`ink-${i}`)) continue;
+
+    const f = document.createElementNS("http://www.w3.org/2000/svg","filter");
+    f.setAttribute("id", `ink-${i}`);
+    f.setAttribute("x","-30%");
+    f.setAttribute("y","-30%");
+    f.setAttribute("width","160%");
+    f.setAttribute("height","160%");
+
+    const alpha = document.createElementNS("http://www.w3.org/2000/svg","feColorMatrix");
+    alpha.setAttribute("in","SourceGraphic");
+    alpha.setAttribute("type","matrix");
+    alpha.setAttribute("values",
+      "0 0 0 0 0 " +
+      "0 0 0 0 0 " +
+      "0 0 0 0 0 " +
+      "0 0 0 1 0");
+    alpha.setAttribute("result","alpha");
+
+    const dil = document.createElementNS("http://www.w3.org/2000/svg","feMorphology");
+    dil.setAttribute("in","alpha");
+    dil.setAttribute("operator","dilate");
+    dil.setAttribute("radius","0.8");
+    dil.setAttribute("result","dil");
+
+    const er = document.createElementNS("http://www.w3.org/2000/svg","feMorphology");
+    er.setAttribute("in","alpha");
+    er.setAttribute("operator","erode");
+    er.setAttribute("radius","0.3");
+    er.setAttribute("result","er");
+
+    const edge = document.createElementNS("http://www.w3.org/2000/svg","feComposite");
+    edge.setAttribute("in","dil");
+    edge.setAttribute("in2","er");
+    edge.setAttribute("operator","out");
+    edge.setAttribute("result","edge");
+
+    const noise = document.createElementNS("http://www.w3.org/2000/svg","feTurbulence");
+    noise.setAttribute("type","fractalNoise");
+    noise.setAttribute("baseFrequency","0.8");
+    noise.setAttribute("numOctaves","1");
+    noise.setAttribute("seed", String((i*97)%997));
+    noise.setAttribute("result","noise");
+
+    const thresh = document.createElementNS("http://www.w3.org/2000/svg","feComponentTransfer");
+    thresh.setAttribute("in","noise");
+    thresh.setAttribute("result","spray");
+    const a = document.createElementNS("http://www.w3.org/2000/svg","feFuncA");
+    a.setAttribute("type","table");
+    a.setAttribute("class","sprayA");
+    a.setAttribute("tableValues","0 0 0 0 0 1 1 1 1 1");
+    thresh.appendChild(a);
+
+    const mask = document.createElementNS("http://www.w3.org/2000/svg","feComposite");
+    mask.setAttribute("in","spray");
+    mask.setAttribute("in2","edge");
+    mask.setAttribute("operator","in");
+    mask.setAttribute("result","sprayMask");
+
+    const ink = document.createElementNS("http://www.w3.org/2000/svg","feFlood");
+    ink.setAttribute("flood-color","#000");
+    ink.setAttribute("result","ink");
+
+    const sprayInk = document.createElementNS("http://www.w3.org/2000/svg","feComposite");
+    sprayInk.setAttribute("in","ink");
+    sprayInk.setAttribute("in2","sprayMask");
+    sprayInk.setAttribute("operator","in");
+    sprayInk.setAttribute("result","sprayInk");
+
+    const merge = document.createElementNS("http://www.w3.org/2000/svg","feMerge");
+    ["SourceGraphic","sprayInk"].forEach(r=>{
+      const n = document.createElementNS("http://www.w3.org/2000/svg","feMergeNode");
+      n.setAttribute("in", r);
+      merge.appendChild(n);
+    });
+
+    [alpha,dil,er,edge,noise,thresh,mask,ink,sprayInk,merge].forEach(x=>f.appendChild(x));
+    host.appendChild(f);
+  }
+}
+
+function updateInkMaterials(){
+  ensureInkMaterialFilters(charsDOM.length);
+
+  // sentence-level volume (median)
+  const vols = peakData.map(d=>clamp(d.vol ?? 0.0, 0, 1)).sort((a,b)=>a-b);
+  const v = vols.length ? vols[Math.floor(vols.length/2)] : 0;
+
+  // thresholds (display-oriented)
+  const BLACK_TH = 0.55;   // above -> pure black
+  const SPRAY_TH = 0.25;   // below -> lighter + spray
+
+  for(let i=0;i<charsDOM.length;i++){
+    const g = charsDOM[i].text;
+    if(!g) continue;
+
+    if(v >= BLACK_TH){
+      // pure black, no spray
+      g.style.filter = "none";
+      g.style.opacity = "1";
+    }else{
+      // fade by volume
+      const opa = clamp(0.35 + v*1.2, 0.35, 0.95);
+      g.style.opacity = opa.toFixed(3);
+
+      // spray only when volume is small
+      if(v <= SPRAY_TH){
+        g.style.filter = `url(#ink-${i})`;
+      }else{
+        g.style.filter = "none";
+      }
+    }
+  }
+}
+
+
+/* ---------- Audio: live monitor ---------- */
+async function startMic(){
+  // Request mic permission only once and reuse stream/context.
+  if(ctx && analyser && streamRef) return streamRef;
+
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  ctx = new AudioCtx();
+  await ctx.resume();
+
+  // Show a one-time in-page hint (not a browser permission prompt)
+  try{
+    if(!localStorage.getItem("mic_hint_shown")){
+      els.status.textContent = "麦克风准备中…（首次仅需允许一次）";
+      localStorage.setItem("mic_hint_shown", "1");
+    }
+  }catch(_){/* ignore */}
+
+  const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+  streamRef = stream;
+
+  analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+
+  const src = ctx.createMediaStreamSource(stream);
+  src.connect(analyser);
+
+  timeData = new Uint8Array(analyser.frequencyBinCount);
+  freqData = new Uint8Array(analyser.frequencyBinCount);
+
+  els.sr.textContent = `${ctx.sampleRate}Hz`;
+  return stream;
+}
+
+function stopMic(){
+  // Keep stream alive so the browser permission prompt won't reappear.
+  // Call this only when you really want to release the mic (e.g., beforeunload).
+  if(streamRef){
+    streamRef.getTracks().forEach(t=>t.stop());
+    streamRef = null;
+  }
+  if(ctx){
+    ctx.close().catch(()=>{});
+    ctx = null;
+  }
+  analyser = null;
+  timeData = null;
+  freqData = null;
+}
+
+function autoCorrelateU8(buf, sr){
+  let SIZE=buf.length;
+  let rms=0;
+  for(let i=0;i<SIZE;i++){
+    let v=(buf[i]-128)/128; rms+=v*v;
+  }
+  if(Math.sqrt(rms/SIZE)<0.01) return -1;
+
+  let r1=0,r2=SIZE-1,thres=0.2;
+  for(let i=0;i<SIZE/2;i++) if(Math.abs(buf[i]-128)<thres){ r1=i; break; }
+  for(let i=1;i<SIZE/2;i++) if(Math.abs(buf[SIZE-i]-128)<thres){ r2=SIZE-i; break; }
+  buf=buf.slice(r1,r2); SIZE=buf.length;
+
+  let c=new Array(SIZE).fill(0);
+  for(let i=0;i<SIZE;i++){
+    for(let j=0;j<SIZE-i;j++){
+      c[i]=c[i]+((buf[j]-128)/128)*((buf[j+i]-128)/128);
+    }
+  }
+
+  let d=0; while(c[d]>c[d+1]) d++;
+  let maxv=-1, maxp=-1;
+  for(let i=d;i<SIZE;i++) if(c[i]>maxv){ maxv=c[i]; maxp=i; }
+  return sr/maxp;
+}
+
+function spectralCentroid(freqBins, sampleRate){
+  let num=0, den=0;
+  const n = freqBins.length;
+  for(let i=0;i<n;i++){
+    const mag = freqBins[i] / 255;
+    const f = (i * sampleRate) / (2*n);
+    num += f * mag;
+    den += mag;
+  }
+  if(den <= 1e-6) return 0;
+  const centroid = num/den;
+  return clamp(centroid/5000, 0, 1);
+}
+
+function resetMonitorHist(){
+  for(const k of Object.keys(hist)){
+    hist[k].fill(0);
+  }
+  els.vInd.textContent = "0";
+  els.pInd.textContent = "— Hz";
+  els.tInd.textContent = "—";
+  els.dInd.textContent = "— ms";
+  els.zInd.textContent = "— ms";
+
+  drawArea(els.cV, hist.vol);
+  drawArea(els.cP, hist.pitch);
+  drawArea(els.cT, hist.timbre);
+  drawArea(els.cD, hist.dur);
+  drawArea(els.cZ, hist.pause);
+}
+
+function monitorLoop(){
+  if(!isHolding || !analyser || !ctx) return;
+
+  rafId = requestAnimationFrame(monitorLoop);
+
+  analyser.getByteTimeDomainData(timeData);
+  analyser.getByteFrequencyData(freqData);
+
+  let sum=0;
+  for(let i=0;i<timeData.length;i++){
+    let v=(timeData[i]-128)/128; sum+=v*v;
+  }
+  let vol = Math.sqrt(sum/timeData.length)*5.0;
+  vol = clamp(vol, 0, 1);
+
+  let pitch = autoCorrelateU8(timeData, ctx.sampleRate);
+  if(pitch>1000) pitch=0;
+
+  let tim = spectralCentroid(freqData, ctx.sampleRate);
+
+  drawWave(els.cWave, timeData);
+
+  els.vInd.textContent = vol.toFixed(2);
+  els.pInd.textContent = (pitch>0 ? pitch.toFixed(0) : "—") + (pitch>0 ? " Hz" : "");
+  els.tInd.textContent = tim.toFixed(2);
+
+  pushHist(hist.vol, vol);
+  pushHist(hist.pitch, clamp((pitch-100)/300, 0, 1));
+  pushHist(hist.timbre, tim);
+
+  pushHist(hist.dur, 0);
+  pushHist(hist.pause, 0);
+
+  drawArea(els.cV, hist.vol);
+  drawArea(els.cP, hist.pitch);
+  drawArea(els.cT, hist.timbre);
+  drawArea(els.cD, hist.dur);
+  drawArea(els.cZ, hist.pause);
+}
+
+/* ---------- Offline analysis (after release) ---------- */
+function rmsFramesFromBuffer(channelData, sr){
+  const hop = Math.max(1, Math.round(sr * (PARAMETERS.frameMs/1000)));
+  const win = hop * 2;
+  const frames = [];
+  for(let i=0; i+win < channelData.length; i += hop){
+    let s=0;
+    for(let j=0;j<win;j++){
+      const v = channelData[i+j];
+      s += v*v;
+    }
+    const rms = Math.sqrt(s/win);
+    let vol = clamp(rms*5.0, 0, 1);
+    frames.push({ t: i/sr, vol });
+  }
+  return { frames };
+}
+
+function splitSegments(frames, threshold, silenceMs){
+  const segs = [];
+  const sil = silenceMs/1000;
+  let inSeg = false;
+  let startT = 0;
+  let lastAboveT = 0;
+
+  for(const fr of frames){
+    if(fr.vol > threshold){
+      if(!inSeg){
+        inSeg = true;
+        startT = fr.t;
+      }
+      lastAboveT = fr.t;
+    }else if(inSeg){
+      if(fr.t - lastAboveT >= sil){
+        const endT = lastAboveT;
+        if((endT - startT)*1000 >= PARAMETERS.minSegMs){
+          segs.push({ startT, endT });
+        }
+        inSeg = false;
+      }
+    }
+  }
+  if(inSeg){
+    const endT = lastAboveT;
+    if((endT - startT)*1000 >= PARAMETERS.minSegMs){
+      segs.push({ startT, endT });
+    }
+  }
+  return segs;
+}
+
+
+// --- Mora-like segmentation (peak/onset + valleys) ---
+// Goal: segments follow Japanese mora rhythm (e.g., ありがとう → 4 segments),
+// not equal division by character count.
+function moraSegmentsFromFrames(frames, threshold, n, durationSec){
+  // Focus on the active (non-silent) region first
+  const region = activeRegion(frames, threshold, durationSec, 60);
+  const sub = frames.filter(fr => fr.t >= region.startT && fr.t <= region.endT);
+  if(sub.length < 8){
+    // too short: fallback to equal split inside active region
+    return splitEqualSegments(region.startT, region.endT, n);
+  }
+
+  // Smooth envelope (moving average)
+  const t = sub.map(fr=>fr.t);
+  const v0 = sub.map(fr=>fr.vol);
+  const smooth = new Array(v0.length).fill(0);
+  const W = 5; // 5-frame window ~ 50ms (frameMs=10)
+  for(let i=0;i<v0.length;i++){
+    let s=0, c=0;
+    for(let k=-Math.floor(W/2); k<=Math.floor(W/2); k++){
+      const j = i+k;
+      if(j>=0 && j<v0.length){ s += v0[j]; c++; }
+    }
+    smooth[i] = s/Math.max(1,c);
+  }
+
+  // Robust threshold: use median & max of smoothed envelope
+  const sorted = [...smooth].sort((a,b)=>a-b);
+  const med = sorted[Math.floor(sorted.length*0.5)] ?? 0;
+  const mx = sorted[sorted.length-1] ?? 0;
+  let baseThr = Math.max(threshold*0.90, med + (mx-med)*0.25);
+
+  const minDist = (PARAMETERS.moraPeakMinDistMs||120)/1000;
+  const promMin = PARAMETERS.moraProminence ?? 0.06;
+
+  function localMinAround(i, r){
+    let m = Infinity;
+    const a = Math.max(0, i-r), b = Math.min(smooth.length-1, i+r);
+    for(let k=a;k<=b;k++) m = Math.min(m, smooth[k]);
+    return m;
+  }
+
+  function findPeaks(thr){
+    const peaks = [];
+    let lastT = -1e9;
+    for(let i=1;i<smooth.length-2;i++){
+      const vi = smooth[i];
+      if(vi < thr) continue;
+      // local max
+      if(!(vi >= smooth[i-1] && vi > smooth[i+1])) continue;
+
+      // prominence check
+      const localMin = localMinAround(i, 8); // ~80ms
+      const prom = vi - localMin;
+      if(prom < promMin) continue;
+
+      const ti = t[i];
+      if(ti - lastT < minDist) continue;
+
+      peaks.push({ i, t: ti, v: vi, score: prom*0.7 + vi*0.3 });
+      lastT = ti;
+    }
+    return peaks;
+  }
+
+  // Iteratively adjust threshold until we have enough peaks
+  let peaks = [];
+  let thrTry = baseThr;
+  const tries = PARAMETERS.moraMaxSearchTries ?? 7;
+  for(let k=0;k<tries;k++){
+    peaks = findPeaks(thrTry);
+    if(peaks.length >= n) break;
+    thrTry *= 0.86; // loosen threshold
+  }
+
+  // If still nothing: fallback to silence segments + valley normalization
+  if(peaks.length === 0){
+    let segs = splitSegments(frames, threshold, PARAMETERS.silenceMs);
+    return normalizeSegmentsToN(segs, frames, threshold, n, durationSec);
+  }
+
+  // If too many peaks, keep the best N by score, then sort by time
+  if(peaks.length > n){
+    peaks.sort((a,b)=>b.score-a.score);
+    peaks = peaks.slice(0,n).sort((a,b)=>a.t-b.t);
+  }
+
+  // If too few peaks, add peaks by searching in the widest gaps (not equal split)
+  while(peaks.length < n){
+    peaks.sort((a,b)=>a.t-b.t);
+    // Build gap candidates: start->first, between, last->end
+    let bestGap = { aT: region.startT, bT: region.endT, span: region.endT-region.startT, insertAt: 0 };
+    const all = [{t: region.startT, i: 0}].concat(peaks).concat([{t: region.endT, i: smooth.length-1}]);
+    for(let gi=0;gi<all.length-1;gi++){
+      const span = all[gi+1].t - all[gi].t;
+      if(span > bestGap.span){
+        bestGap = { aT: all[gi].t, bT: all[gi+1].t, span, insertAt: gi };
+      }
+    }
+    // Find max within that gap
+    let bestI = -1, bestV = -1;
+    for(let i=0;i<smooth.length;i++){
+      if(t[i] <= bestGap.aT || t[i] >= bestGap.bT) continue;
+      if(smooth[i] > bestV){
+        bestV = smooth[i];
+        bestI = i;
+      }
+    }
+    if(bestI < 0){
+      // fallback: split by valleys normalization
+      let segs = splitSegments(frames, threshold, PARAMETERS.silenceMs);
+      return normalizeSegmentsToN(segs, frames, threshold, n, durationSec);
+    }
+    peaks.push({ i: bestI, t: t[bestI], v: smooth[bestI], score: bestV });
+  }
+
+  peaks.sort((a,b)=>a.t-b.t);
+
+  // Convert peaks to boundaries by valley (minimum) between consecutive peaks
+  const boundaries = [region.startT];
+  for(let pi=0; pi<peaks.length-1; pi++){
+    const a = peaks[pi].i, b = peaks[pi+1].i;
+    let minI = Math.min(a,b), maxI = Math.max(a,b);
+    let bestI = Math.floor((minI+maxI)/2);
+    let bestV = Infinity;
+
+    // Search valley, ignore the first/last 15% of the interval
+    const span = maxI - minI;
+    const left = minI + Math.floor(span*0.15);
+    const right = maxI - Math.floor(span*0.15);
+    for(let i=left;i<=right;i++){
+      if(smooth[i] < bestV){
+        bestV = smooth[i];
+        bestI = i;
+      }
+    }
+    boundaries.push(t[bestI]);
+  }
+  boundaries.push(region.endT);
+
+  // Build segments and enforce minimum duration
+  const segs = [];
+  const minMs = PARAMETERS.minSegMs ?? 90;
+  for(let i=0;i<n;i++){
+    let s = boundaries[i];
+    let e = boundaries[i+1];
+    if(e <= s) e = s + 0.05;
+    // ensure min duration
+    if((e-s)*1000 < minMs){
+      const pad = (minMs/1000 - (e-s))/2;
+      s = Math.max(region.startT, s - pad);
+      e = Math.min(region.endT, e + pad);
+    }
+    segs.push({ startT: s, endT: e });
+  }
+
+  // Final sort & clamp
+  segs.sort((x,y)=>x.startT-y.startT);
+  for(const seg of segs){
+    seg.startT = clamp(seg.startT, 0, durationSec);
+    seg.endT = clamp(seg.endT, 0, durationSec);
+    if(seg.endT <= seg.startT) seg.endT = Math.min(durationSec, seg.startT + 0.08);
+  }
+  return segs;
+}
+
+// --- Equal split by character count (N = number of chars) ---
+function activeRegion(frames, threshold, durationSec, padMs=80){
+  let first = null, last = null;
+  for(const fr of frames){
+    if(fr.vol > threshold){
+      if(first === null) first = fr.t;
+      last = fr.t;
+    }
+  }
+  if(first === null || last === null){
+    return { startT: 0, endT: durationSec };
+  }
+  const pad = padMs/1000;
+  return {
+    startT: Math.max(0, first - pad),
+    endT: Math.min(durationSec, last + pad)
+  };
+}
+
+function splitEqualSegments(startT, endT, n){
+  const segs = [];
+  const total = Math.max(0.001, endT - startT);
+  const step = total / Math.max(1, n);
+  for(let i=0;i<n;i++){
+    const a = startT + i*step;
+    const b = (i === n-1) ? endT : (startT + (i+1)*step);
+    segs.push({ startT: a, endT: b });
+  }
+  return segs;
+}
+
+
+function autoCorrelateF32(buf, sr){
+  const SIZE = buf.length;
+  let rms=0;
+  for(let i=0;i<SIZE;i++){ const v = buf[i]; rms += v*v; }
+  if(Math.sqrt(rms/SIZE) < 0.01) return -1;
+
+  const c = new Float32Array(SIZE);
+  for(let lag=0; lag<SIZE; lag++){
+    let sum=0;
+    for(let i=0; i<SIZE-lag; i++){
+      sum += buf[i]*buf[i+lag];
+    }
+    c[lag] = sum;
+  }
+
+  let d=0; while(d+1<SIZE && c[d] > c[d+1]) d++;
+  let maxv=-1, maxp=-1;
+  for(let i=d; i<SIZE; i++){
+    if(c[i] > maxv){ maxv = c[i]; maxp = i; }
+  }
+  if(maxp <= 0) return -1;
+  return sr / maxp;
+}
+
+function median(arr){
+  const a = arr.filter(v=>Number.isFinite(v) && v>0).sort((x,y)=>x-y);
+  if(!a.length) return -1;
+  const mid = Math.floor(a.length/2);
+  return a.length%2 ? a[mid] : (a[mid-1]+a[mid])/2;
+}
+
+function analyzeSegment(audio, sr, seg, threshold){
+  const startS = Math.max(0, Math.floor(seg.startT * sr));
+  const endS   = Math.min(audio.length, Math.floor(seg.endT * sr));
+  const slice = audio.subarray(startS, endS);
+
+  let volPeak = 0;
+  let active = 0; // count of 10ms hops above threshold
+  const hop = Math.max(1, Math.round(sr * 0.01));
+  for(let i=0; i+hop < slice.length; i += hop){
+    let ss=0;
+    for(let j=0;j<hop;j++){
+      const v = slice[i+j];
+      ss += v*v;
+    }
+    const rms = Math.sqrt(ss/hop);
+    const v01 = clamp(rms*5.0, 0, 1);
+    volPeak = Math.max(volPeak, v01);
+    if(v01 > (threshold ?? 0.03)) active++;
+  }
+  const activeMs = active * (hop/sr) * 1000;
+
+  // Use segment length as the pronunciation duration (requested mapping for LNK1)
+  const durMs = (seg.endT - seg.startT) * 1000;
+
+  const win = 2048;
+  const ps = [];
+  const pts = [0.15, 0.35, 0.55, 0.75];
+  for(const r of pts){
+    const center = Math.floor(slice.length * r);
+    const st = clamp(center - Math.floor(win/2), 0, Math.max(0, slice.length-win));
+    if(st + win <= slice.length){
+      const w = slice.subarray(st, st+win);
+      const p = autoCorrelateF32(w, sr);
+      if(p > 50 && p < 800) ps.push(p);
+    }
+  }
+  const pitch = median(ps);
+  const pitchClamped = (pitch>0 ? clamp(pitch, PARAMETERS.pitchRange[0], PARAMETERS.pitchRange[1]) : 150);
+
+  let zc=0;
+  for(let i=1;i<slice.length;i++){
+    if((slice[i-1] >= 0 && slice[i] < 0) || (slice[i-1] < 0 && slice[i] >= 0)) zc++;
+  }
+  const zcr = clamp((zc / slice.length) * 400, 0, 1);
+
+  return { vol: volPeak, pitch: pitchClamped, dur: durMs, activeDur: activeMs, timbre: zcr };
+}
+
+// Spread values across characters so that each glyph gets a noticeably
+// different parameter set, even when the raw audio features are close.
+function spread01(values){
+  const n = values.length;
+  if(n <= 1) return values.map(()=>0.5);
+
+  // Normalize to 0..1 using min/max
+  let mn = Infinity, mx = -Infinity;
+  for(const v of values){
+    if(Number.isFinite(v)){
+      mn = Math.min(mn, v);
+      mx = Math.max(mx, v);
+    }
+  }
+  if(!Number.isFinite(mn) || !Number.isFinite(mx) || Math.abs(mx-mn) < 1e-9){
+    // fallback: use rank only
+    const idx = values.map((v,i)=>[v,i]).sort((a,b)=>(a[0]-b[0]));
+    const out = new Array(n).fill(0.5);
+    for(let r=0;r<n;r++) out[idx[r][1]] = r/(n-1);
+    return out;
+  }
+  const norm = values.map(v => clamp((v-mn)/(mx-mn), 0, 1));
+
+  // Rank-based quantiles for guaranteed separation
+  const idx = norm.map((v,i)=>[v,i]).sort((a,b)=>(a[0]-b[0]));
+  const q = new Array(n).fill(0.5);
+  for(let r=0;r<n;r++) q[idx[r][1]] = r/(n-1);
+
+  // Mix raw norm + quantile, then increase contrast
+  return norm.map((v,i)=>{
+    const m = 0.35*v + 0.65*q[i];
+    const c = clamp(0.5 + (m-0.5)*1.9, 0, 1);
+    return c;
+  });
+}
+
+
+function enhancePeakDataForSeparation(){
+  const n = peakData.length;
+  if(n <= 1) return;
+
+  // Preserve raw (for debug)
+  for(const d of peakData){
+    d.volRaw = d.vol;
+    d.pitchRaw = d.pitch;
+    d.durRaw = d.dur;
+  }
+
+  // Spread vol & pitch strongly (rank+contrast), keep duration monotonic but more legible.
+  const vS = spread01(peakData.map(d=>d.vol));
+  const pS = spread01(peakData.map(d=>d.pitch));
+
+  // Duration: normalize by the recording reference, then apply contrast and a light rank-mix.
+  const dur01 = peakData.map(d=>clamp((d.dur||0) / Math.max(1, durRefMs), 0, 1));
+  const durRank = spread01(dur01); // gives guaranteed separation but preserves order
+  const uS = dur01.map((u,i)=>{
+    const m = 0.65*u + 0.35*durRank[i];
+    // contrast up
+    return clamp(0.5 + (m-0.5)*2.2, 0, 1);
+  });
+
+  for(let i=0;i<n;i++){
+    peakData[i].volS01 = clamp(vS[i], 0.02, 1);
+    peakData[i].pitchS01 = clamp(pS[i], 0, 1);
+    peakData[i].durS01 = clamp(uS[i], 0, 1);
+  }
+}
+
+
+// --- Non-uniform segmentation: use silence-based segments, then normalize to N (chars) ---
+function segmentDurationMs(seg){ return (seg.endT - seg.startT) * 1000; }
+
+function normalizeSegmentsToN(segs, frames, threshold, n, durationSec){
+  let out = (segs || []).map(s=>({ startT: s.startT, endT: s.endT })).filter(s=>s.endT > s.startT);
+
+  // If nothing detected (very quiet), fallback to a single segment across whole audio
+  if(out.length === 0){
+    out = [{ startT: 0, endT: durationSec }];
+  }
+
+  // Merge / split until we have exactly n segments
+  const minMs = PARAMETERS.minSegMs;
+
+  function mergeAt(i){
+    if(out.length <= 1) return;
+    const a = out[i];
+    const b = out[i+1];
+    const merged = { startT: Math.min(a.startT,b.startT), endT: Math.max(a.endT,b.endT) };
+    out.splice(i, 2, merged);
+  }
+
+  function bestValleySplit(seg){
+    // Find a split point at the lowest-energy valley inside the segment.
+    // If no suitable valley, split mid.
+    const startT = seg.startT, endT = seg.endT;
+    const dur = endT - startT;
+    if(dur <= (minMs*2)/1000) return (startT + endT) / 2;
+
+    // Consider only middle band to avoid tiny head/tail
+    const bandA = startT + dur*0.20;
+    const bandB = startT + dur*0.80;
+
+    let bestT = (startT + endT)/2;
+    let bestV = Infinity;
+    for(const fr of frames){
+      if(fr.t < bandA || fr.t > bandB) continue;
+      // Use raw vol (already 0..1). Prefer lower vol as boundary.
+      if(fr.vol < bestV){
+        bestV = fr.vol;
+        bestT = fr.t;
+      }
+    }
+    // If valley is still "loud" (no clear dip), use midpoint
+    if(!(bestV < threshold*1.6)) bestT = (startT + endT)/2;
+
+    // Ensure split keeps both parts >= minMs
+    const leftMs = (bestT - startT) * 1000;
+    const rightMs = (endT - bestT) * 1000;
+    if(leftMs < minMs || rightMs < minMs){
+      bestT = (startT + endT)/2;
+    }
+    return bestT;
+  }
+
+  // If too many segments: merge the shortest with its best neighbor
+  while(out.length > n){
+    let minIdx = 0;
+    let minDur = Infinity;
+    for(let i=0;i<out.length;i++){
+      const d = segmentDurationMs(out[i]);
+      if(d < minDur){
+        minDur = d;
+        minIdx = i;
+      }
+    }
+    // merge with neighbor that yields smaller merged duration
+    if(minIdx === 0){
+      mergeAt(0);
+    }else if(minIdx === out.length-1){
+      mergeAt(out.length-2);
+    }else{
+      const left = { startT: out[minIdx-1].startT, endT: out[minIdx].endT };
+      const right = { startT: out[minIdx].startT, endT: out[minIdx+1].endT };
+      const dL = segmentDurationMs(left);
+      const dR = segmentDurationMs(right);
+      if(dL <= dR) mergeAt(minIdx-1);
+      else mergeAt(minIdx);
+    }
+  }
+
+  // If too few segments: split the longest at valleys
+  while(out.length < n){
+    let maxIdx = 0;
+    let maxDur = -Infinity;
+    for(let i=0;i<out.length;i++){
+      const d = segmentDurationMs(out[i]);
+      if(d > maxDur){
+        maxDur = d;
+        maxIdx = i;
+      }
+    }
+    const seg = out[maxIdx];
+    const splitT = bestValleySplit(seg);
+    const a = { startT: seg.startT, endT: splitT };
+    const b = { startT: splitT, endT: seg.endT };
+
+    // guard
+    if(segmentDurationMs(a) < minMs || segmentDurationMs(b) < minMs){
+      // if cannot split meaningfully, just split evenly
+      const mid = (seg.startT + seg.endT)/2;
+      out.splice(maxIdx, 1, { startT: seg.startT, endT: mid }, { startT: mid, endT: seg.endT });
+    }else{
+      out.splice(maxIdx, 1, a, b);
+    }
+  }
+
+  // sort by time
+  out.sort((x,y)=>x.startT - y.startT);
+  return out;
+}
+
+
+
+
+function decideVoiceMode(){
+  // Sentence-level loudness: use median of per-char peaks for robustness
+  const vols = peakData.map(d=>clamp(d.vol ?? 0, 0, 1)).sort((a,b)=>a-b);
+  const mid = vols.length ? vols[Math.floor(vols.length/2)] : 0;
+  // Thresholds tuned for "display": make quiet/loud clearly different
+  if(mid < 0.18) return "quiet";
+  if(mid > 0.42) return "loud";
+  return "normal";
+}
+function gainForMode(mode){
+  // Display-oriented: exaggerate differences but keep typography stable
+  if(mode === "quiet") return 0.68;   // thinner/narrower/lower
+  if(mode === "loud")  return 1.38;   // bolder/wider/taller
+  return 1.0;
+}
+
+async function analyzeAndApplyFromBlob(blob){
+  els.status.textContent = "解析中…";
+
+  const ab = await blob.arrayBuffer();
+
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const dctx = new AudioCtx();
+  const audioBuf = await dctx.decodeAudioData(ab);
+  await dctx.close();
+
+  const channel = audioBuf.getChannelData(0);
+  const sr = audioBuf.sampleRate;
+
+  const { frames } = rmsFramesFromBuffer(channel, sr);
+  const threshold = parseFloat(els.sens.value);
+
+  const nChar = Array.from(currentText).length;
+
+  // 1) Mora-like segmentation (peak/onset + valleys) to match Japanese mora rhythm
+  //    (e.g., ありがとう → 4 segments). Not equal split.
+  let segs = moraSegmentsFromFrames(frames, threshold, nChar, audioBuf.duration);
+
+  // 3) Analyze each segment and map to each character (1 segment → 1 glyph)
+  let prevEnd = 0;
+  let maxDur = 1;
+
+  for(let i=0;i<nChar;i++){
+    const seg = segs[i];
+    const feat = analyzeSegment(channel, sr, seg, threshold);
+
+    const pauseMs = Math.max(0, (seg.startT - prevEnd) * 1000);
+    prevEnd = seg.endT;
+
+    peakData[i] = { ...peakData[i], ...feat, pause: pauseMs };
+    maxDur = Math.max(maxDur, feat.dur || 0);
+  }
+
+  // Use per-recording max segment duration to normalize LNK1 so differences are visible
+  durRefMs = clamp(maxDur, 220, 1600);
+
+  // Boost per-character differences while keeping monotonic relations
+  enhancePeakDataForSeparation();
+
+  // Sentence-level exaggeration for exhibition (quiet vs loud should look very different)
+  voiceMode = decideVoiceMode();
+  voiceGain = gainForMode(voiceMode);
+  window.voiceMode = voiceMode;
+  window.voiceGain = voiceGain;
+  const modeLabel = (voiceMode === 'quiet') ? '小声' : (voiceMode === 'loud') ? '大声' : '普通';
+  els.status.textContent = `解析中…（${modeLabel}）`;
+
+  const totalDur = segs.reduce((s,g)=>s + (g.endT-g.startT), 0) * 1000;
+  const totalPause = peakData.reduce((s,d)=>s + (d.pause||0), 0);
+  els.dInd.textContent = `${Math.round(totalDur)} ms`;
+  els.zInd.textContent = `${Math.round(totalPause)} ms`;
+
+  // update monitor buffers to show "summary"
+  const volHist = peakData.map(d=>d.vol);
+  const pitchHist = peakData.map(d=>clamp((d.pitch-100)/300,0,1));
+  const timHist = peakData.map(d=>d.timbre);
+
+  for(let i=0;i<HIST_N;i++){
+    const idx = Math.floor(i/HIST_N * volHist.length);
+    hist.vol[i] = volHist[idx] ?? 0;
+    hist.pitch[i] = pitchHist[idx] ?? 0;
+    hist.timbre[i] = timHist[idx] ?? 0;
+    hist.dur[i] = 0;
+    hist.pause[i] = 0;
+  }
+  drawArea(els.cV, hist.vol);
+  drawArea(els.cP, hist.pitch);
+  drawArea(els.cT, hist.timbre);
+
+  await tweenApply(520);
+
+  finishAndSnap();
+  els.status.textContent = "完成";
+}
+
+function tweenApply(ms){
+  return new Promise(resolve=>{
+    const start = performance.now();
+    const from = peakData.map(d=>({ vol:0.10, pitch:150, dur:0, timbre:d.timbre, pause:d.pause }));
+    const to = peakData.map(d=>({ ...d }));
+
+    function step(t){
+      const k = clamp((t-start)/ms, 0, 1);
+      for(let i=0;i<peakData.length;i++){
+        peakData[i].vol = from[i].vol + (to[i].vol - from[i].vol)*k;
+        peakData[i].pitch = from[i].pitch + (to[i].pitch - from[i].pitch)*k;
+        peakData[i].dur = from[i].dur + (to[i].dur - from[i].dur)*k;
+      }
+      refreshLayout(false);
+      // Keep characters touching but non-overlapping during the tween.
+      adjustNoOverlap();
+      if(k < 1) requestAnimationFrame(step);
+      else resolve();
+    }
+    requestAnimationFrame(step);
+  });
+}
+
+/* ---------- UI wiring ---------- */
+function setPhraseActive(text){
+  document.querySelectorAll(".phrase").forEach(b=>{
+    b.classList.toggle("active", b.dataset.text === text);
+  });
+}
+function updateTextFromUI(text){
+  els.txt.value = text;
+  setPhraseActive(text);
+  initText(text);
+}
+
+els.phraseRow.addEventListener("click", (e)=>{
+  const btn = e.target.closest(".phrase");
+  if(!btn) return;
+  if(isHolding) return;
+  updateTextFromUI(btn.dataset.text);
+});
+els.txt.addEventListener("change", ()=>{
+  if(isHolding) return;
+  const v = els.txt.value.trim() || "ありがとう";
+  updateTextFromUI(v);
+});
+els.sens.addEventListener("input", ()=>{
+  els.sensVal.textContent = parseFloat(els.sens.value).toFixed(3);
+});
+
+els.btnReset.addEventListener("click", ()=>{
+  if(isHolding) endHold(true);
+  resetMonitorHist();
+  els.status.textContent = "準備完了";
+  initText(els.txt.value.trim() || "ありがとう");
+});
+
+els.btnRec.addEventListener("contextmenu", (e)=> e.preventDefault());
+
+els.btnRec.addEventListener("pointerdown", async (e)=>{
+  if(isHolding) return;
+  e.preventDefault();
+  await beginHold();
+});
+
+// release can happen outside the button, so listen on window too
+window.addEventListener("pointerup", (e)=>{
+  if(!isHolding) return;
+  endHold(false);
+}, { passive:false });
+
+window.addEventListener("pointercancel", (e)=>{
+  if(!isHolding) return;
+  endHold(true);
+}, { passive:false });
+
+async function beginHold(){
+  try{
+    initText(els.txt.value.trim() || "ありがとう");
+    resetMonitorHist();
+    await calibrateAxisRanges();
+
+    const stream = await startMic();
+
+    recordedChunks = [];
+    const opts = {};
+    if(MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) opts.mimeType = "audio/webm;codecs=opus";
+    else if(MediaRecorder.isTypeSupported("audio/webm")) opts.mimeType = "audio/webm";
+    mediaRecorder = new MediaRecorder(stream, opts);
+
+    mediaRecorder.ondataavailable = (ev)=>{
+      if(ev.data && ev.data.size>0) recordedChunks.push(ev.data);
+    };
+
+    mediaRecorder.start();
+    isHolding = true;
+
+    els.btnRec.classList.add("recording");
+    els.btnRec.textContent = "録音中…（離して解析）";
+    els.status.textContent = "録音中…";
+    monitorLoop();
+  }catch(e){
+    console.error(e);
+    alert("Mic Error: " + e.message);
+    endHold(true);
+  }
+}
+
+function endHold(cancel){
+  isHolding = false;
+  els.btnRec.classList.remove("recording");
+  els.btnRec.textContent = "長押し録音";
+
+  if(rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+
+  const finalize = async ()=>{
+    try{
+      if(cancel){
+        els.status.textContent = "キャンセル";
+        return;
+      }
+      const blob = new Blob(recordedChunks, { type: recordedChunks[0]?.type || "audio/webm" });
+      await analyzeAndApplyFromBlob(blob);
+    }catch(e){
+      console.error(e);
+      alert("解析に失敗しました: " + e.message);
+      els.status.textContent = "失敗";
+    }finally{
+      // Do NOT stop mic here (reuse stream).
+      mediaRecorder = null;
+      recordedChunks = [];
+    }
+  };
+
+  if(mediaRecorder && mediaRecorder.state !== "inactive"){
+    mediaRecorder.onstop = finalize;
+    try{ mediaRecorder.stop(); }catch(_){ finalize(); }
+  }else{
+    finalize();
+  }
+}
+
+/* ---------- Init ---------- */
+els.sensVal.textContent = parseFloat(els.sens.value).toFixed(3);
+initText(currentText);
+
+window.addEventListener("resize", ()=>{
+  redrawLeftCharts();
+});
+</script>
+</body>
+</html>
